@@ -8,6 +8,7 @@ use rand::Rng;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::Alignment;
 use ratatui::style::{Color, Style, Stylize};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Padding, Paragraph};
 use ratatui::Frame;
 
@@ -16,7 +17,7 @@ const SCRAMBLE_MOVES: usize = 30;
 
 #[derive(Clone, Debug, Default)]
 struct App {
-    color_background: bool,
+    color_bg: bool,
     state: State,
 }
 
@@ -66,17 +67,6 @@ struct Scramble {
 impl Default for Scramble {
     fn default() -> Self {
         Self::random()
-    }
-}
-
-impl std::fmt::Display for Scramble {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.moves[0])?;
-        for mov in self.moves[1..].iter() {
-            write!(f, " {}", mov)?;
-        }
-
-        Ok(())
     }
 }
 
@@ -246,7 +236,7 @@ fn input(app: &mut App) -> Result<bool, Box<dyn Error>> {
                 match k.code {
                     KeyCode::Char('q') => return Ok(false),
                     KeyCode::Char('c') => {
-                        app.color_background = !app.color_background;
+                        app.color_bg = !app.color_bg;
                     }
                     KeyCode::Char('r') if app.state.is_idle() => {
                         app.state = State::Idle(Scramble::random());
@@ -277,42 +267,106 @@ fn update(app: &mut App) {
 }
 
 fn ui(app: &mut App, frame: &mut Frame) {
-    let size = frame.size();
-
-    let (text, color) = match app.state {
+    match app.state {
         State::Idle(scramble) => {
-            let text = format!("Press space to start\n\n{scramble}");
-            (text, Color::Gray)
+            let mut scramble_line = Vec::with_capacity(2 * SCRAMBLE_MOVES);
+            for mov in scramble.moves.iter() {
+                let mut str = String::with_capacity(4);
+                write!(&mut str, "{mov}").ok();
+                let color_idx = (mov.dir() as u8).trailing_zeros() as u8;
+                let color = Color::Indexed(color_idx + 1);
+                let span = Span::styled(str, color);
+                scramble_line.push(span);
+                scramble_line.push(Span::from(" "));
+            }
+            scramble_line.pop();
+
+            let lines = vec![
+                Line::from("Press space to start"),
+                Line::from(""),
+                Line::from(""),
+                Line::from(scramble_line),
+            ];
+
+            centered_text(
+                frame,
+                lines,
+                app.color_bg,
+                Color::Rgb(0xc0, 0xc0, 0xc0),
+                Color::Rgb(0x20, 0x20, 0x20),
+            );
         }
         State::Inspecting(start) => {
             let duration = Instant::now().duration_since(start);
             let remaining = INSPECT_DURATION.saturating_sub(duration);
             let secs = remaining.as_secs_f32();
-            let text = format!("Inspecting\n\n{secs:.3}s");
-            (text, Color::Blue)
+            let lines = vec![
+                Line::from("Inspecting"),
+                Line::from(""),
+                Line::from(""),
+                Line::from(format!("{secs:.3}s")),
+            ];
+
+            let (bg, fg) = if remaining < Duration::from_secs(3) {
+                (Color::Rgb(0xd0, 0x90, 0x60), Color::Rgb(0x90, 0x50, 0x30))
+            } else {
+                (Color::Rgb(0x70, 0x70, 0xd0), Color::Rgb(0x30, 0x30, 0x70))
+            };
+            centered_text(frame, lines, app.color_bg, bg, fg);
         }
         State::Solving(start) => {
             let duration = Instant::now().duration_since(start);
             let secs = duration.as_secs_f32();
-            let text = format!("Solving\n\n{secs:.3}s");
-            (text, Color::Green)
+            let lines = vec![
+                Line::from("Solving"),
+                Line::from(""),
+                Line::from(""),
+                Line::from(format!("{secs:.3}s")),
+            ];
+            centered_text(
+                frame,
+                lines,
+                app.color_bg,
+                Color::Rgb(0x50, 0xa0, 0x50),
+                Color::Rgb(0x30, 0x60, 0x30),
+            );
         }
         State::Done(duration) => {
             let secs = duration.as_secs_f32();
-            let text = format!("Done\n\n{secs:.3}s");
-            (text, Color::Magenta)
+            let lines = vec![
+                Line::from("Done"),
+                Line::from(""),
+                Line::from(""),
+                Line::from(format!("{secs:.3}s")),
+            ];
+            centered_text(
+                frame,
+                lines,
+                app.color_bg,
+                Color::Rgb(0xa0, 0x60, 0xa0),
+                Color::Rgb(0x70, 0x30, 0x60),
+            );
         }
-    };
+    }
+}
 
+fn centered_text<'a>(
+    frame: &mut Frame,
+    text: impl Into<Text<'a>>,
+    color_bg: bool,
+    fg_color: Color,
+    bg_color: Color,
+) {
+    let size = frame.size();
     let mut block = Block::new().padding(Padding::top((size.height / 2).saturating_sub(1)));
-    if app.color_background {
-        block = block.style(Style::new().bg(color));
+    if color_bg {
+        block = block.style(Style::new().bg(bg_color));
     }
 
-    let fg_color = if app.color_background {
-        Color::Black
+    let fg_color = if color_bg {
+        Color::Rgb(0xe0, 0xe0, 0xc0)
     } else {
-        color
+        fg_color
     };
 
     let p = Paragraph::new(text)
