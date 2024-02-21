@@ -12,6 +12,7 @@ use ratatui::widgets::{Block, Padding, Paragraph};
 use ratatui::Frame;
 
 const INSPECT_DURATION: Duration = Duration::from_secs(15);
+const SCRAMBLE_MOVES: usize = 30;
 
 #[derive(Clone, Debug, Default)]
 struct App {
@@ -58,7 +59,7 @@ impl State {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Scramble {
-    moves: [Move; 20],
+    moves: [Move; SCRAMBLE_MOVES],
 }
 
 impl Default for Scramble {
@@ -81,9 +82,9 @@ impl std::fmt::Display for Scramble {
 impl Scramble {
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
-        let mut moves = [Move(0); 20];
+        let mut moves = [Move(0); SCRAMBLE_MOVES];
         moves[0] = Move::random(&mut rng);
-        for i in 1..20 {
+        for i in 1..SCRAMBLE_MOVES {
             let prev_dir = moves[i - 1].dir();
             moves[i] = Move::random_without(&mut rng, prev_dir);
         }
