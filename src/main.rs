@@ -80,7 +80,14 @@ impl std::fmt::Display for Scramble {
 
 impl Scramble {
     pub fn random() -> Self {
-        let moves = std::array::from_fn(|_| Move::random());
+        let mut rng = rand::thread_rng();
+        let mut moves = [Move(0); 20];
+        moves[0] = Move::random(&mut rng);
+        for i in 1..20 {
+            let prev_dir = moves[i - 1].dir();
+            moves[i] = Move::random_without(&mut rng, prev_dir);
+        }
+
         Self { moves }
     }
 }
@@ -111,11 +118,39 @@ impl Move {
     const MAGNITUDE: u8 = 0x80;
     const REVERSE: u8 = 0x40;
 
-    pub fn random() -> Self {
-        let mut rng = rand::thread_rng();
-        let mut mov = Self(0);
-        rng.fill(&mut mov);
-        mov
+    pub fn random(rng: &mut impl Rng) -> Self {
+        let mut mov: u8 = rng.gen_range(0..6);
+
+        let mag = rng.gen_bool(0.5);
+        if mag {
+            mov |= Self::MAGNITUDE;
+        } else {
+            let rev = rng.gen_bool(0.5);
+            if rev {
+                mov |= Self::REVERSE;
+            }
+        }
+
+        Self(mov)
+    }
+
+    pub fn random_without(rng: &mut impl Rng, dir: Dir) -> Self {
+        let mut mov: u8 = rng.gen_range(0..5);
+        if mov >= (dir as u8) {
+            mov += 1;
+        }
+
+        let mag = rng.gen_bool(0.5);
+        if mag {
+            mov |= Self::MAGNITUDE;
+        } else {
+            let rev = rng.gen_bool(0.5);
+            if rev {
+                mov |= Self::REVERSE;
+            }
+        }
+
+        Self(mov)
     }
 
     pub fn dir(&self) -> Dir {
@@ -134,25 +169,6 @@ impl Move {
             true => Mod::Reverse,
             false => Mod::Forward,
         }
-    }
-}
-
-impl rand::Fill for Move {
-    fn try_fill<R: rand::prelude::Rng + ?Sized>(&mut self, rng: &mut R) -> Result<(), rand::Error> {
-        let mut mov: u8 = rng.gen_range(0..6);
-
-        let mag = rng.gen_bool(0.5);
-        if mag {
-            mov |= Self::MAGNITUDE;
-        } else {
-            let rev = rng.gen_bool(0.5);
-            if rev {
-                mov |= Self::REVERSE;
-            }
-        }
-
-        self.0 = mov;
-        Ok(())
     }
 }
 
