@@ -16,6 +16,7 @@ const SCRAMBLE_MOVES: usize = 30;
 
 #[derive(Clone, Debug, Default)]
 struct App {
+    color_background: bool,
     state: State,
 }
 
@@ -224,6 +225,9 @@ fn input(app: &mut App) -> Result<bool, Box<dyn Error>> {
             if k.kind == KeyEventKind::Press {
                 match k.code {
                     KeyCode::Char('q') => return Ok(false),
+                    KeyCode::Char('c') => {
+                        app.color_background = !app.color_background;
+                    }
                     KeyCode::Char('r') if app.state.is_idle() => {
                         app.state = State::Idle(Scramble::random());
                     }
@@ -257,31 +261,43 @@ fn ui(app: &mut App, frame: &mut Frame) {
 
     let (text, color) = match app.state {
         State::Idle(scramble) => {
-            let text = format!("Press space to start\n{scramble}");
-            (text, Color::Yellow)
+            let text = format!("Press space to start\n\n{scramble}");
+            (text, Color::Gray)
         }
         State::Inspecting(start) => {
             let duration = Instant::now().duration_since(start);
             let remaining = INSPECT_DURATION.saturating_sub(duration);
             let secs = remaining.as_secs_f32();
-            let text = format!("Inspecting\n{secs:.3}s");
+            let text = format!("Inspecting\n\n{secs:.3}s");
             (text, Color::Blue)
         }
         State::Solving(start) => {
             let duration = Instant::now().duration_since(start);
             let secs = duration.as_secs_f32();
-            let text = format!("Solving\n{secs:.3}s");
+            let text = format!("Solving\n\n{secs:.3}s");
             (text, Color::Green)
         }
         State::Done(duration) => {
             let secs = duration.as_secs_f32();
-            let text = format!("Done\n{secs:.3}s");
-            (text, Color::Yellow)
+            let text = format!("Done\n\n{secs:.3}s");
+            (text, Color::Magenta)
         }
     };
+
+    let mut block = Block::new().padding(Padding::top((size.height / 2).saturating_sub(1)));
+    if app.color_background {
+        block = block.style(Style::new().bg(color));
+    }
+
+    let fg_color = if app.color_background {
+        Color::Black
+    } else {
+        color
+    };
+
     let p = Paragraph::new(text)
-        .block(Block::new().padding(Padding::top(size.height / 2)))
-        .style(Style::new().fg(color).bold())
+        .block(block)
+        .style(Style::new().fg(fg_color).bold())
         .alignment(Alignment::Center);
     frame.render_widget(p, size);
 }
