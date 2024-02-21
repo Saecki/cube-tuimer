@@ -84,12 +84,11 @@ impl Scramble {
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
         let mut moves = [Move(0); SCRAMBLE_MOVES];
-        moves[0] = Move::random(&mut rng);
-        for i in 1..SCRAMBLE_MOVES {
-            let prev_dir = moves[i - 1].dir();
-            moves[i] = Move::random_without(&mut rng, prev_dir);
+        let mut prev_dirs = PrevDirs(0);
+        for mov in &mut moves {
+            *mov = Move::random(&mut rng, prev_dirs);
+            prev_dirs.update(mov.dir());
         }
-
         Self { moves }
     }
 }
@@ -108,7 +107,7 @@ impl std::fmt::Display for Move {
             Dir::Down => f.write_char('D')?,
         }
         match self.modifier() {
-            Mod::Forward => (),
+            Mod::Forward => f.write_char(' ')?,
             Mod::Reverse => f.write_char('\'')?,
             Mod::Double => f.write_char('2')?,
         }
@@ -117,26 +116,29 @@ impl std::fmt::Display for Move {
 }
 
 impl Move {
-    const DOUBLE: u8 = 0x80;
-    const REVERSE: u8 = 0x40;
+    #[rustfmt::skip]
+    const DOUBLE: u8   = 0b1000_0000;
+    #[rustfmt::skip]
+    const REVERSE: u8  = 0b0100_0000;
+    #[rustfmt::skip]
+    const DIR_MASK: u8 = 0b0011_1111;
 
-    pub fn random(rng: &mut impl Rng) -> Self {
-        let mut mov: u8 = rng.gen_range(0..6);
+    pub fn random(rng: &mut impl Rng, prev_dirs: PrevDirs) -> Self {
+        let mut mov = 0;
 
-        let modifier: u8 = rng.gen_range(0..3);
-        match modifier {
-            0 => (),
-            1 => mov |= Self::REVERSE,
-            2 | _ => mov |= Self::DOUBLE,
-        }
+        let num_dirs = 6 - prev_dirs.0.count_ones() as u8;
+        let mut dir: u8 = rng.gen_range(0..num_dirs);
 
-        Self(mov)
-    }
+        for i in 0..6 {
+            let bit = 1 << i;
+            if !prev_dirs.get(bit) {
+                if dir == 0 {
+                    mov |= bit;
+                    break;
+                }
 
-    pub fn random_without(rng: &mut impl Rng, dir: Dir) -> Self {
-        let mut mov: u8 = rng.gen_range(0..5);
-        if mov >= (dir as u8) {
-            mov += 1;
+                dir -= 1;
+            }
         }
 
         let modifier: u8 = rng.gen_range(0..3);
@@ -150,7 +152,7 @@ impl Move {
     }
 
     pub fn dir(&self) -> Dir {
-        let dir = self.0 & 0x07;
+        let dir = self.0 & Self::DIR_MASK;
         // SAFETY: Dir is repr(u8)
         unsafe { std::mem::transmute(dir) }
     }
@@ -166,15 +168,33 @@ impl Move {
     }
 }
 
-#[allow(unused)]
+#[derive(Clone, Copy)]
+struct PrevDirs(u8);
+
+impl PrevDirs {
+    fn update(&mut self, dir: Dir) {
+        self.0 &= match dir {
+            Dir::Front | Dir::Back => Dir::Front as u8 | Dir::Back as u8,
+            Dir::Left | Dir::Right => Dir::Left as u8 | Dir::Right as u8,
+            Dir::Up | Dir::Down => Dir::Up as u8 | Dir::Down as u8,
+        };
+        self.0 |= dir as u8;
+    }
+
+    fn get(&self, bit: u8) -> bool {
+        (self.0 & bit) != 0
+    }
+}
+
 #[repr(u8)]
+#[rustfmt::skip]
 enum Dir {
-    Front = 0x00,
-    Back = 0x01,
-    Left = 0x02,
-    Right = 0x03,
-    Up = 0x04,
-    Down = 0x05,
+    Front = 1 << 0,
+    Back  = 1 << 1,
+    Left  = 1 << 2,
+    Right = 1 << 3,
+    Up    = 1 << 4,
+    Down  = 1 << 5,
 }
 
 enum Mod {
