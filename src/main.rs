@@ -116,20 +116,17 @@ impl std::fmt::Display for Move {
 }
 
 impl Move {
-    const MAGNITUDE: u8 = 0x80;
+    const DOUBLE: u8 = 0x80;
     const REVERSE: u8 = 0x40;
 
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut mov: u8 = rng.gen_range(0..6);
 
-        let mag = rng.gen_bool(0.5);
-        if mag {
-            mov |= Self::MAGNITUDE;
-        } else {
-            let rev = rng.gen_bool(0.5);
-            if rev {
-                mov |= Self::REVERSE;
-            }
+        let modifier: u8 = rng.gen_range(0..3);
+        match modifier {
+            0 => (),
+            1 => mov |= Self::REVERSE,
+            2 | _ => mov |= Self::DOUBLE,
         }
 
         Self(mov)
@@ -141,14 +138,11 @@ impl Move {
             mov += 1;
         }
 
-        let mag = rng.gen_bool(0.5);
-        if mag {
-            mov |= Self::MAGNITUDE;
-        } else {
-            let rev = rng.gen_bool(0.5);
-            if rev {
-                mov |= Self::REVERSE;
-            }
+        let modifier: u8 = rng.gen_range(0..3);
+        match modifier {
+            0 => (),
+            1 => mov |= Self::REVERSE,
+            2 | _ => mov |= Self::DOUBLE,
         }
 
         Self(mov)
@@ -161,12 +155,10 @@ impl Move {
     }
 
     pub fn modifier(&self) -> Mod {
-        let mag = (self.0 & Self::MAGNITUDE) != 0;
-        if mag {
+        if (self.0 & Self::DOUBLE) != 0 {
             return Mod::Double;
         }
-        let rev = (self.0 & Self::REVERSE) != 0;
-        match rev {
+        match (self.0 & Self::REVERSE) != 0 {
             true => Mod::Reverse,
             false => Mod::Forward,
         }
