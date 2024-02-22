@@ -13,7 +13,7 @@ use ratatui::widgets::{Block, Padding, Paragraph};
 use ratatui::Frame;
 
 const INSPECT_DURATION: Duration = Duration::from_secs(15);
-const SCRAMBLE_MOVES: usize = 30;
+const SCRAMBLE_MOVES: usize = 40;
 
 #[derive(Clone, Debug, Default)]
 struct App {
@@ -270,24 +270,29 @@ fn update(app: &mut App) {
 fn ui(app: &mut App, frame: &mut Frame) {
     match app.state {
         State::Idle(scramble) => {
-            let mut scramble_line = Vec::with_capacity(2 * SCRAMBLE_MOVES);
-            for mov in scramble.moves.iter() {
-                let mut str = String::with_capacity(4);
-                write!(&mut str, "{mov}").ok();
-                let color_idx = (mov.dir() as u8).trailing_zeros() as u8;
-                let color = Color::Indexed(color_idx + 1);
-                let span = Span::styled(str, color);
-                scramble_line.push(span);
-                scramble_line.push(Span::from(" "));
-            }
-            scramble_line.pop();
-
-            let lines = vec![
+            let mut lines = vec![
                 Line::from("Press space to start"),
                 Line::from(""),
                 Line::from(""),
-                Line::from(scramble_line),
             ];
+            for i in 0..2 {
+                let num_line_moves = SCRAMBLE_MOVES / 2;
+                let start = i * num_line_moves;
+                let end = (i + 1) * num_line_moves;
+                let mut scramble_line = Vec::with_capacity(SCRAMBLE_MOVES);
+                for mov in scramble.moves[start..end].iter() {
+                    let mut str = String::with_capacity(4);
+                    write!(&mut str, "{mov}").ok();
+                    let color_idx = (mov.dir() as u8).trailing_zeros() as u8;
+                    let color = Color::Indexed(color_idx + 1);
+                    let span = Span::styled(str, color);
+                    scramble_line.push(span);
+                    scramble_line.push(Span::from(" "));
+                }
+                scramble_line.pop();
+                lines.push(Line::from(scramble_line));
+                lines.push(Line::from(""));
+            }
 
             centered_text(
                 frame,
