@@ -242,6 +242,7 @@ fn input(app: &mut App) -> Result<bool, Box<dyn Error>> {
                         app.state = State::Idle(Scramble::random());
                     }
                     KeyCode::Char(' ') => app.state.next(),
+                    KeyCode::Backspace => app.state = State::Idle(Scramble::random()),
                     _ => (),
                 }
             }
